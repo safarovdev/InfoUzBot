@@ -9,21 +9,22 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Update
 
-# --- НАСТРОЙКИ (ВСТАВЬ СВОИ ДАННЫЕ) ---
+# --- 1. НАСТРОЙКИ ---
 TOKEN = '8381035959:AAFggEA6wuLgsxK7xCHa6WGLWg7vN0n4zGA'
 ADMIN_ID = 8352512372
 GROUP_ID = -1003562115857
-# Твой домен из панели Koyeb (без / в конце)
 BASE_URL = "https://confident-maggi-infouzbot-1847c816.koyeb.app"
 
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
 logging.basicConfig(level=logging.INFO)
+
+# --- 2. ИНИЦИАЛИЗАЦИЯ БОТА И ДИСПЕТЧЕРА ---
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# --- СОСТОЯНИЯ ---
+# --- 3. СОСТОЯНИЯ FSM ---
 class Form(StatesGroup):
     niche = State()
     description = State()
@@ -31,7 +32,7 @@ class Form(StatesGroup):
     phone = State()
     name = State()
 
-# --- КЛАВИАТУРЫ ---
+# --- 4. КЛАВИАТУРЫ ---
 def main_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚀 Заказать сайт", callback_data="pre_order")],
@@ -63,7 +64,34 @@ def get_welcome_text():
         "Выберите нужный раздел ниже:"
     )
 
-# --- ОБРАБОТЧИКИ ---
+# --- 5. ЛОГИКА ВЕБХУКА (FastAPI) ---
+# Создаем FastAPI и lifespan ДО использования в декораторах @app
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Устанавливаем вебхук при запуске
+    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
+    logging.info(f"Вебхук установлен на {WEBHOOK_URL}")
+    yield
+    # При выключении вебхук не удаляем, чтобы сообщения не терялись
+
+app = FastAPI(lifespan=lifespan)
+
+@app.post(WEBHOOK_PATH)
+async def bot_webhook(request: Request):
+    try:
+        json_str = await request.json()
+        update = Update.model_validate(json_str, context={"bot": bot})
+        await dp.feed_update(bot, update)
+    except Exception as e:
+        logging.error(f"Ошибка в вебхуке: {e}")
+    return {"ok": True}
+
+@app.get("/")
+async def index():
+    return "Bot is running!"
+
+# --- 6. ОБРАБОТЧИКИ AIOGRAM ---
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -72,7 +100,7 @@ async def cmd_start(message: types.Message):
 @dp.callback_query(F.data == "to_main")
 async def back_to_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.answer(get_welcome_text(), reply_markup=main_kb(), parse_mode="Markdown")
+    await callback.message.edit_text(get_welcome_text(), reply_markup=main_kb(), parse_mode="Markdown")
     await callback.answer()
 
 @dp.callback_query(F.data == "contacts")
@@ -131,8 +159,8 @@ async def process_desc(message: types.Message, state: FSMContext):
 @dp.callback_query(Form.budget)
 async def process_budget(callback: CallbackQuery, state: FSMContext):
     budgets = {"b200": "200-300$", "b350": "350-500$", "b800": "800-1000$", "bskip": "Пропущен"}
-    await state.update_data(budget=budgets[callback.data])
-    await callback.message.edit_text(f"✅ Бюджет: {budgets[callback.data]}")
+    await state.update_data(budget=budgets.get(callback.data, "Не указан"))
+    await callback.message.edit_text(f"✅ Бюджет: {budgets.get(callback.data, 'Не указан')}")
     await callback.message.answer("4️⃣ **Введите ваш номер телефона:**")
     await state.set_state(Form.phone)
     await callback.answer()
@@ -163,14 +191,15 @@ async def process_name(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "confirm")
 async def confirm_order(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
+    username = f"@{callback.from_user.username}" if callback.from_user.username else "нет"
     admin_msg = (
         f"🚀 **НОВАЯ ЗАЯВКА**\n\n"
-        f"👤 Имя: {data['name']}\n"
-        f"📁 Ниша: {data['niche']}\n"
-        f"💰 Бюджет: {data['budget']}\n"
-        f"📞 Тел: {data['phone']}\n"
+        f"👤 Имя: {data.get('name')}\n"
+        f"📁 Ниша: {data.get('niche')}\n"
+        f"💰 Бюджет: {data.get('budget')}\n"
+        f"📞 Тел: {data.get('phone')}\n"
         f"📝 Описание: {data.get('description', 'Нет описания')}\n"
-        f"🔗 Юзер: @{callback.from_user.username if callback.from_user.username else 'нет'}"
+        f"🔗 Юзер: {username}"
     )
     
     try:
@@ -186,28 +215,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
 
-# --- ЛОГИКА ВЕБХУКА (FastAPI) ---
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # drop_pending_updates=True удаляет сообщения, пришедшие, пока бот лежал
-    await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
-    logging.info(f"Вебхук установлен на {WEBHOOK_URL}")
-    yield
-    # При перезагрузке не удаляем вебхук, чтобы он не пропадал
-    # await bot.delete_webhook()  <-- закомментируй эту строку
-
-@app.post(WEBHOOK_PATH)
-async def bot_webhook(request: Request):
-    update = Update.model_validate(await request.json(), context={"bot": bot})
-    await dp.feed_update(bot, update)
-    return {"ok": True}
-
-@app.get("/")
-async def index():
-    return "Bot is running!"
-
+# --- 7. ЗАПУСК ---
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
