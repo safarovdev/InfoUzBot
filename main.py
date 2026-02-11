@@ -10,12 +10,12 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Update
 
 # --- НАСТРОЙКИ ---
-TOKEN = '8381035959:AAGJKrNcU8APOFEz4GjTsf-zKsMrWS8yTvc'
+TOKEN = '8381035959:AAFggEA6wuLgsxK7xCHa6WGLWg7vN0n4zGA'
 ADMIN_ID = 8352512372
 GROUP_ID = -1003562115857
-# В Koyeb URL будет вида: https://имя-приложения-сгенерированное.koyeb.app
-# Но мы подтянем его автоматически позже или укажем вручную
-BASE_URL = "https://confident-maggi-infouzbot-1847c816.koyeb.app" 
+
+# Твой адрес БЕЗ лишних знаков в конце
+BASE_URL = "https://confident-maggi-infouzbot-1847c816.koyeb.app"
 
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
@@ -100,4 +100,5 @@ async def index():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
