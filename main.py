@@ -190,13 +190,12 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # При запуске сервера ставим вебхук
+    # drop_pending_updates=True удаляет сообщения, пришедшие, пока бот лежал
     await bot.set_webhook(url=WEBHOOK_URL, drop_pending_updates=True)
+    logging.info(f"Вебхук установлен на {WEBHOOK_URL}")
     yield
-    # При выключении удаляем (необязательно, но чисто)
-    await bot.delete_webhook()
-
-app = FastAPI(lifespan=lifespan)
+    # При перезагрузке не удаляем вебхук, чтобы он не пропадал
+    # await bot.delete_webhook()  <-- закомментируй эту строку
 
 @app.post(WEBHOOK_PATH)
 async def bot_webhook(request: Request):
@@ -211,3 +210,4 @@ async def index():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
