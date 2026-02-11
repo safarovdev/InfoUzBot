@@ -15,7 +15,10 @@ ADMIN_ID = 8352512372
 GROUP_ID = -1003562115857
 # В Koyeb URL будет вида: https://имя-приложения-сгенерированное.koyeb.app
 # Но мы подтянем его автоматически позже или укажем вручную
+BASE_URL = "https://confident-maggi-infouzbot-1847c816.koyeb.app" 
+
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
+WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -97,3 +100,4 @@ async def index():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
